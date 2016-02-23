@@ -89,7 +89,7 @@ void PFMoveToApplicationsFolderIfNecessary(void) {
 	needAuthorization |= ([fm fileExistsAtPath:destinationPath] && ![fm isWritableFileAtPath:destinationPath]);
 
 	// Setup the alert
-	NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+	NSAlert *alert = [NSAlert new];
 	{
 		NSString *informativeText = nil;
 
@@ -201,7 +201,7 @@ void PFMoveToApplicationsFolderIfNecessary(void) {
 fail:
 	{
 		// Show failure message
-		alert = [[[NSAlert alloc] init] autorelease];
+		alert = [NSAlert new];
 		[alert setMessageText:kStrMoveApplicationCouldNotMove];
 		[alert runModal];
 	}
@@ -312,7 +312,7 @@ static NSString *ContainingDiskImageDevice(NSString *path) {
 
 	NSString *device = [[NSFileManager defaultManager] stringWithFileSystemRepresentation:fs.f_mntfromname length:strlen(fs.f_mntfromname)];
 
-	NSTask *hdiutil = [[[NSTask alloc] init] autorelease];
+	NSTask *hdiutil = [NSTask new];
 	[hdiutil setLaunchPath:@"/usr/bin/hdiutil"];
 	[hdiutil setArguments:[NSArray arrayWithObjects:@"info", @"-plist", nil]];
 	[hdiutil setStandardOutput:[NSPipe pipe]];

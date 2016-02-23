@@ -42,7 +42,7 @@ static NSString *AlertSuppressKey = @"moveToApplicationsFolderAlertSuppress";
 
 
 // Helper functions
-static NSString *PreferredInstallLocation(BOOL *isUserDirectory);
+static NSString* PreferredInstallLocation(BOOL *isUserDirectory, bool inForceToRootApplications);
 static BOOL IsInApplicationsFolder(NSString *path);
 static BOOL IsInDownloadsFolder(NSString *path);
 static BOOL IsApplicationAtPathRunning(NSString *path);
@@ -56,7 +56,7 @@ static NSString *ShellQuotedString(NSString *string);
 static void Relaunch(NSString *destinationPath);
 
 // Main worker function
-void PFMoveToApplicationsFolderIfNecessary(void) {
+void PFMoveToApplicationsFolderIfNecessary(bool inForceToRootApplications) {
 	// Skip if user suppressed the alert before
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:AlertSuppressKey]) return;
 
@@ -78,7 +78,7 @@ void PFMoveToApplicationsFolderIfNecessary(void) {
 
 	// Since we are good to go, get the preferred installation directory.
 	BOOL installToUserApplications = NO;
-	NSString *applicationsDirectory = PreferredInstallLocation(&installToUserApplications);
+	NSString *applicationsDirectory = PreferredInstallLocation(&installToUserApplications, inForceToRootApplications);
 	NSString *bundleName = [bundlePath lastPathComponent];
 	NSString *destinationPath = [applicationsDirectory stringByAppendingPathComponent:bundleName];
 
@@ -210,28 +210,31 @@ fail:
 #pragma mark -
 #pragma mark Helper Functions
 
-static NSString *PreferredInstallLocation(BOOL *isUserDirectory) {
+static NSString *PreferredInstallLocation(BOOL *isUserDirectory, bool inForceToRootApplications) {
 	// Return the preferred install location.
 	// Assume that if the user has a ~/Applications folder, they'd prefer their
 	// applications to go there.
 
 	NSFileManager *fm = [NSFileManager defaultManager];
 
-	NSArray *userApplicationsDirs = NSSearchPathForDirectoriesInDomains(NSApplicationDirectory, NSUserDomainMask, YES);
+	if (inForceToRootApplications == false)
+	{
+		NSArray *userApplicationsDirs = NSSearchPathForDirectoriesInDomains(NSApplicationDirectory, NSUserDomainMask, YES);
 
-	if ([userApplicationsDirs count] > 0) {
-		NSString *userApplicationsDir = [userApplicationsDirs objectAtIndex:0];
-		BOOL isDirectory;
+		if ([userApplicationsDirs count] > 0) {
+			NSString *userApplicationsDir = [userApplicationsDirs objectAtIndex:0];
+			BOOL isDirectory;
 
-		if ([fm fileExistsAtPath:userApplicationsDir isDirectory:&isDirectory] && isDirectory) {
-			// User Applications directory exists. Get the directory contents.
-			NSArray *contents = [fm contentsOfDirectoryAtPath:userApplicationsDir error:NULL];
+			if ([fm fileExistsAtPath:userApplicationsDir isDirectory:&isDirectory] && isDirectory) {
+				// User Applications directory exists. Get the directory contents.
+				NSArray *contents = [fm contentsOfDirectoryAtPath:userApplicationsDir error:NULL];
 
-			// Check if there is at least one ".app" inside the directory.
-			for (NSString *contentsPath in contents) {
-				if ([[contentsPath pathExtension] isEqualToString:@"app"]) {
-					if (isUserDirectory) *isUserDirectory = YES;
-					return [userApplicationsDir stringByResolvingSymlinksInPath];
+				// Check if there is at least one ".app" inside the directory.
+				for (NSString *contentsPath in contents) {
+					if ([[contentsPath pathExtension] isEqualToString:@"app"]) {
+						if (isUserDirectory) *isUserDirectory = YES;
+						return [userApplicationsDir stringByResolvingSymlinksInPath];
+					}
 				}
 			}
 		}

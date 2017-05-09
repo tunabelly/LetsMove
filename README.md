@@ -8,8 +8,9 @@ A sample project that demonstrates how to move a running Mac OS X application to
 
 Requirements
 ------------
-Builds and runs on Mac OS X 10.8 or higher. Does NOT support sandboxed applications.
-
+- Builds and runs on Mac OS X 10.8 or higher. 
+- This version is built around and requires ARC.
+- Does NOT support sandboxed applications. 
 
 Usage
 -----
@@ -20,8 +21,6 @@ Copy the following files into your project:
 - PFMoveApplication.m
 
 In your app delegate's "-[applicationWillFinishLaunching:]" method, call the PFMoveToApplicationsFolderIfNecessary function at the very top.
-
-If your project has ARC enabled, you'll want to disable ARC on the above files. You can do so by adding -fno-objc-arc compiler flag to your PFMoveApplication.m source file. See http://stackoverflow.com/questions/6646052/how-can-i-disable-arc-for-a-single-file-in-a-project/6658549#6658549
 
 If your application is localized, also copy the 'MoveApplication.string' files into your project.
 

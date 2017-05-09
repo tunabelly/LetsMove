@@ -8,7 +8,7 @@ A sample project that demonstrates how to move a running Mac OS X application to
 
 Requirements
 ------------
-Builds and runs on Mac OS X 10.5 or higher. Does NOT support sandboxed applications.
+Builds and runs on Mac OS X 10.8 or higher. Does NOT support sandboxed applications.
 
 
 Usage

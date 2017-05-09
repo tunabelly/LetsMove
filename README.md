@@ -35,6 +35,9 @@ Public domain
 Version History
 ---------------
 
+* 1.22
+	- Fix not deleting or trashing itself after copying to /Applications in macOS Sierra
+
 * 1.20
 	- Support for applications bundled inside another application
 	- Brazilian Portuguese localization slightly updated

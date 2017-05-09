@@ -5,6 +5,14 @@ A sample project that demonstrates how to move a running Mac OS X application to
 
 ![Screenshot](http://i.imgur.com/euTRZiI.png)
 
+Changes from original
+------------
+
+- Not all the files have all the latest changes pulled in, however the PFMoveApplication.h/mm files do.
+- Some of the new strings used are only in English.
+- ARC is used for memory management
+- macOS 10.8 or higher is required.
+- The PFMoveToApplicationsFolderIfNecessary call has been modified to take a boolean which tells it whether or not to force the copy into the root Applications folder (as opposed to the user's Applications folder).
 
 Requirements
 ------------

@@ -22,9 +22,11 @@
 #define kStrMoveApplicationQuestionTitle  _I10NS(@"Move to Applications folder?")
 #define kStrMoveApplicationQuestionTitleHome _I10NS(@"Move to Applications folder in your Home folder?")
 #define kStrMoveApplicationQuestionMessage _I10NS(@"I can move myself to the Applications folder if you'd like.")
+#define kStrMoveApplicationQuestionMessageHome _I10NS(@"I can move myself to the Applications folder if you'd like. You can choose either the main Applications, or the one in your home folder.")
 #define kStrMoveApplicationButtonMove _I10NS(@"Move to Applications Folder")
 #define kStrMoveApplicationButtonDoNotMove _I10NS(@"Do Not Move")
 #define kStrMoveApplicationQuestionInfoWillRequirePasswd _I10NS(@"Note that this will require an administrator password.")
+#define kStrMoveApplicationQuestionInfoWillRequirePasswdHome _I10NS(@"Note that this will require an administrator password to move to the main Applications folder.")
 #define kStrMoveApplicationQuestionInfoInDownloadsFolder _I10NS(@"This will keep your Downloads folder uncluttered.")
 
 // By default, we use a small control/font for the suppression button.
@@ -51,7 +53,7 @@ static NSString *ShellQuotedString(NSString *string);
 static void Relaunch(NSString *destinationPath);
 
 // Main worker function
-void PFMoveToApplicationsFolderIfNecessary(bool inForceToRootApplications) {
+void PFMoveToApplicationsFolderIfNecessary() {
 	// Skip if user suppressed the alert before
 	if ([[NSUserDefaults standardUserDefaults] boolForKey:AlertSuppressKey]) return;
 
@@ -73,39 +75,58 @@ void PFMoveToApplicationsFolderIfNecessary(bool inForceToRootApplications) {
 
 	// Since we are good to go, get the preferred installation directory.
 	BOOL installToUserApplications = NO;
-	NSString *applicationsDirectory = PreferredInstallLocation(&installToUserApplications, inForceToRootApplications);
+	NSString *rootApplicationsDirectory = PreferredInstallLocation(&installToUserApplications, true);
+	NSString *applicationsDirectory = PreferredInstallLocation(&installToUserApplications, false);
 	NSString *bundleName = [bundlePath lastPathComponent];
 	NSString *destinationPath = [applicationsDirectory stringByAppendingPathComponent:bundleName];
+	NSString *rootDestinationPath = [rootApplicationsDirectory stringByAppendingPathComponent:bundleName];
 
 	// Check if we need admin password to write to the Applications directory
-	BOOL needAuthorization = ([fm isWritableFileAtPath:applicationsDirectory] == NO);
+	BOOL needAuthorization = ([fm isWritableFileAtPath:rootApplicationsDirectory] == NO);
 
 	// Check if the destination bundle is already there but not writable
-	needAuthorization |= ([fm fileExistsAtPath:destinationPath] && ![fm isWritableFileAtPath:destinationPath]);
+	needAuthorization |= ([fm fileExistsAtPath:rootDestinationPath] && ![fm isWritableFileAtPath:rootDestinationPath]);
 
 	// Setup the alert
 	NSAlert *alert = [NSAlert new];
 	{
 		NSString *informativeText = nil;
 
-		[alert setMessageText:(installToUserApplications ? kStrMoveApplicationQuestionTitleHome : kStrMoveApplicationQuestionTitle)];
+		[alert setMessageText:kStrMoveApplicationQuestionTitle];
 
-		informativeText = kStrMoveApplicationQuestionMessage;
+		if (installToUserApplications == YES) {
+			informativeText = kStrMoveApplicationQuestionMessageHome;
+		}
+		else {
+			informativeText = kStrMoveApplicationQuestionMessage;
+		}
 
 		if (needAuthorization) {
-			informativeText = [informativeText stringByAppendingString:@" "];
-			informativeText = [informativeText stringByAppendingString:kStrMoveApplicationQuestionInfoWillRequirePasswd];
+			if (installToUserApplications == YES) {
+				informativeText = [informativeText stringByAppendingFormat:@" %@", kStrMoveApplicationQuestionInfoWillRequirePasswdHome];
+			}
+			else {
+				informativeText = [informativeText stringByAppendingFormat:@" %@", kStrMoveApplicationQuestionInfoWillRequirePasswd];
+			}
 		}
 		else if (IsInDownloadsFolder(bundlePath)) {
 			// Don't mention this stuff if we need authentication. The informative text is long enough as it is in that case.
-			informativeText = [informativeText stringByAppendingString:@" "];
-			informativeText = [informativeText stringByAppendingString:kStrMoveApplicationQuestionInfoInDownloadsFolder];
+			informativeText = [informativeText stringByAppendingFormat:@" %@", kStrMoveApplicationQuestionInfoInDownloadsFolder];
 		}
 
 		[alert setInformativeText:informativeText];
 
-		// Add accept button
-		[alert addButtonWithTitle:kStrMoveApplicationButtonMove];
+		if (installToUserApplications == YES)
+		{
+			// add accept for /Applications
+			[alert addButtonWithTitle:@"Move to Applications"];
+			[alert addButtonWithTitle:@"Move to Home Applications"];
+		}
+		else
+		{
+			// Add accept button
+			[alert addButtonWithTitle:kStrMoveApplicationButtonMove];
+		}
 
 		// Add deny button
 		NSButton *cancelButton = [alert addButtonWithTitle:kStrMoveApplicationButtonDoNotMove];
@@ -126,9 +147,22 @@ void PFMoveToApplicationsFolderIfNecessary(bool inForceToRootApplications) {
 		[NSApp activateIgnoringOtherApps:YES];
 	}
 
-	if ([alert runModal] == NSAlertFirstButtonReturn) {
-		NSLog(@"INFO -- Moving myself to the Applications folder");
+	NSModalResponse modalResponse = [alert runModal];
+	if ((modalResponse == NSAlertFirstButtonReturn) || (modalResponse == NSAlertSecondButtonReturn))
+	{
+		if (modalResponse == NSAlertFirstButtonReturn) {
+			NSLog(@"INFO -- Moving myself to the Applications folder");
+		}
+		else {
+			NSLog(@"INFO -- Moving myself to the home Applications folder");
+		}
 
+		// if the user had the choice and chose the root applications folder, make sure to use that instead
+		if ((installToUserApplications == YES) && (modalResponse == NSAlertFirstButtonReturn)) {
+			destinationPath = rootDestinationPath;
+			applicationsDirectory = rootApplicationsDirectory;
+		}
+		
 		// Move
 		if (needAuthorization) {
 			BOOL authorizationCanceled;
@@ -335,55 +369,76 @@ static NSString *ContainingDiskImageDevice(NSString *path) {
 
 static BOOL Trash(NSString *path) {
 	BOOL result = [[NSFileManager defaultManager] trashItemAtURL:[NSURL fileURLWithPath:path] resultingItemURL:NULL error:NULL];
-
+	
+	// As a last resort try trashing with AppleScript.
+	// This allows us to trash the app in macOS Sierra even when the app is running inside
+	// an app translocation image.
+	if (!result) {
+		NSAppleScript *appleScript = [[NSAppleScript alloc] initWithSource:
+									   [NSString stringWithFormat:@"\
+										set theFile to POSIX file \"%@\" \n\
+										tell application \"Finder\" \n\
+										move theFile to trash \n\
+										end tell", path]];
+		NSDictionary *errorDict = nil;
+		NSAppleEventDescriptor *scriptResult = [appleScript executeAndReturnError:&errorDict];
+		if (scriptResult == nil) {
+			NSLog(@"Trash AppleScript error: %@", errorDict);
+		}
+		result = (scriptResult != nil);
+	}
+	
 	if (!result) {
 		NSLog(@"ERROR -- Could not trash '%@'", path);
 	}
-
+	
 	return result;
 }
 
 static BOOL DeleteOrTrash(NSString *path) {
 	NSError *error;
-
+	
 	if ([[NSFileManager defaultManager] removeItemAtPath:path error:&error]) {
 		return YES;
 	}
 	else {
-		NSLog(@"WARNING -- Could not delete '%@': %@", path, [error localizedDescription]);
+		// Don't log warning if on Sierra and running inside App Translocation path
+		if (![path containsString:@"/AppTranslocation/"])
+			NSLog(@"WARNING -- Could not delete '%@': %@", path, [error localizedDescription]);
+		
 		return Trash(path);
 	}
 }
 
 static BOOL AuthorizedInstall(NSString *srcPath, NSString *dstPath, BOOL *canceled) {
 	if (canceled) *canceled = NO;
-
+	
 	// Make sure that the destination path is an app bundle. We're essentially running 'sudo rm -rf'
 	// so we really don't want to fuck this up.
 	if (![[dstPath pathExtension] isEqualToString:@"app"]) return NO;
-
+	
 	// Do some more checks
 	if ([[dstPath stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] length] == 0) return NO;
 	if ([[srcPath stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] length] == 0) return NO;
-
+	
 	int pid, status;
 	AuthorizationRef myAuthorizationRef;
-
+	
 	// Get the authorization
 	OSStatus err = AuthorizationCreate(NULL, kAuthorizationEmptyEnvironment, kAuthorizationFlagDefaults, &myAuthorizationRef);
 	if (err != errAuthorizationSuccess) return NO;
-
+	
 	AuthorizationItem myItems = {kAuthorizationRightExecute, 0, NULL, 0};
 	AuthorizationRights myRights = {1, &myItems};
 	AuthorizationFlags myFlags = (AuthorizationFlags)(kAuthorizationFlagInteractionAllowed | kAuthorizationFlagExtendRights | kAuthorizationFlagPreAuthorize);
-
+	
 	err = AuthorizationCopyRights(myAuthorizationRef, &myRights, NULL, myFlags, NULL);
 	if (err != errAuthorizationSuccess) {
 		if (err == errAuthorizationCanceled && canceled)
 			*canceled = YES;
 		goto fail;
 	}
-
+	
 	static OSStatus (*security_AuthorizationExecuteWithPrivileges)(AuthorizationRef authorization, const char *pathToTool,
 																   AuthorizationFlags options, char * const *arguments,
 																   FILE **communicationsPipe) = NULL;
@@ -394,36 +449,36 @@ static BOOL AuthorizedInstall(NSString *srcPath, NSString *dstPath, BOOL *cancel
 		// they keep the function and throw some sort of exception, this won't fail gracefully, but that's a
 		// risk we'll have to take for now.
 		security_AuthorizationExecuteWithPrivileges = (OSStatus (*)(AuthorizationRef, const char*,
-																   AuthorizationFlags, char* const*,
-																   FILE **)) dlsym(RTLD_DEFAULT, "AuthorizationExecuteWithPrivileges");
+																	AuthorizationFlags, char* const*,
+																	FILE **)) dlsym(RTLD_DEFAULT, "AuthorizationExecuteWithPrivileges");
 	}
 	if (!security_AuthorizationExecuteWithPrivileges) goto fail;
-
+	
 	// Delete the destination
 	{
 		char *args[] = {"-rf", (char *)[dstPath fileSystemRepresentation], NULL};
 		err = security_AuthorizationExecuteWithPrivileges(myAuthorizationRef, "/bin/rm", kAuthorizationFlagDefaults, args, NULL);
 		if (err != errAuthorizationSuccess) goto fail;
-
+		
 		// Wait until it's done
 		pid = wait(&status);
 		if (pid == -1 || !WIFEXITED(status)) goto fail; // We don't care about exit status as the destination most likely does not exist
 	}
-
+	
 	// Copy
 	{
 		char *args[] = {"-pR", (char *)[srcPath fileSystemRepresentation], (char *)[dstPath fileSystemRepresentation], NULL};
 		err = security_AuthorizationExecuteWithPrivileges(myAuthorizationRef, "/bin/cp", kAuthorizationFlagDefaults, args, NULL);
 		if (err != errAuthorizationSuccess) goto fail;
-
+		
 		// Wait until it's done
 		pid = wait(&status);
 		if (pid == -1 || !WIFEXITED(status) || WEXITSTATUS(status)) goto fail;
 	}
-
+	
 	AuthorizationFree(myAuthorizationRef, kAuthorizationFlagDefaults);
 	return YES;
-
+	
 fail:
 	AuthorizationFree(myAuthorizationRef, kAuthorizationFlagDefaults);
 	return NO;

@@ -1,7 +1,7 @@
 LetsMove
 ========
 
-A sample project that demonstrates how to move a running Mac OS X application to the Applications folder.
+A sample project that demonstrates how to move a running macOS application to the Applications folder.
 
 ![Screenshot](https://raw.github.com/tunabelly/LetsMove/master/screenshot.png)
 
@@ -16,7 +16,7 @@ Changes from original
 
 Requirements
 ------------
-- Builds and runs on Mac OS X 10.8 or higher. 
+- Builds and runs on macOS 10.8 or higher. 
 - This version is built around and requires ARC.
 - Does NOT support sandboxed applications. 
 
@@ -161,6 +161,7 @@ Code Contributors:
 * Whitney Young
 * Nick Moore
 * Nicholas Riley
+* Matt Austin
 
 
 Translators:

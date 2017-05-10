@@ -3,7 +3,7 @@ LetsMove
 
 A sample project that demonstrates how to move a running Mac OS X application to the Applications folder.
 
-![Screenshot](http://i.imgur.com/euTRZiI.png)
+![Screenshot](https://raw.github.com/tunabelly/LetsMove/master/screenshot.png)
 
 Changes from original
 ------------
@@ -12,7 +12,7 @@ Changes from original
 - Some of the new strings used are only in English.
 - ARC is used for memory management
 - macOS 10.8 or higher is required.
-- The PFMoveToApplicationsFolderIfNecessary call has been modified to take a boolean which tells it whether or not to force the copy into the root Applications folder (as opposed to the user's Applications folder).
+- If both the /Applications and ~/Applications folder exist, the user will be prompted to choose which one to install into. This allows flexibilty so there's no confusion as to where it went.
 
 Requirements
 ------------

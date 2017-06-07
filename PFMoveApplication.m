@@ -29,6 +29,9 @@
 #define kStrMoveApplicationQuestionInfoWillRequirePasswdHome _I10NS(@"Note that this will require an administrator password to move to the main Applications folder.")
 #define kStrMoveApplicationQuestionInfoInDownloadsFolder _I10NS(@"This will keep your Downloads folder uncluttered.")
 
+#define kStrMoveApplicationButtonMoveRootApps _I10NS(@"Move to Applications")
+#define kStrMoveApplicationButtonMoveHomeApps _I10NS(@"Move to Home Applications")
+
 // By default, we use a small control/font for the suppression button.
 // If you prefer to use the system default (to match your other alerts),
 // set this to 0.
@@ -119,8 +122,8 @@ void PFMoveToApplicationsFolderIfNecessary() {
 		if (installToUserApplications == YES)
 		{
 			// add accept for /Applications
-			[alert addButtonWithTitle:@"Move to Applications"];
-			[alert addButtonWithTitle:@"Move to Home Applications"];
+			[alert addButtonWithTitle:kStrMoveApplicationButtonMoveRootApps];
+			[alert addButtonWithTitle:kStrMoveApplicationButtonMoveHomeApps];
 		}
 		else
 		{
@@ -148,7 +151,21 @@ void PFMoveToApplicationsFolderIfNecessary() {
 	}
 
 	NSModalResponse modalResponse = [alert runModal];
-	if ((modalResponse == NSAlertFirstButtonReturn) || (modalResponse == NSAlertSecondButtonReturn))
+	BOOL isOkToContinue = NO;
+	
+	// check if the "Do Not Move" button was pressed
+	if (installToUserApplications == YES) {
+		if ((modalResponse == NSAlertFirstButtonReturn) || (modalResponse == NSAlertSecondButtonReturn)) {
+			isOkToContinue = YES;
+		}
+	}
+	else {
+		if (modalResponse == NSAlertFirstButtonReturn) {
+			isOkToContinue = YES;
+		}
+	}
+	
+	if (isOkToContinue == YES)
 	{
 		if (modalResponse == NSAlertFirstButtonReturn) {
 			NSLog(@"INFO -- Moving myself to the Applications folder");
